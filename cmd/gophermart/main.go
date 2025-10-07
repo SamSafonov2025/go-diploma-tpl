@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/SamSafonov2025/go-diploma-tpl/internal/app/logger"
 	"github.com/SamSafonov2025/go-diploma-tpl/internal/app/server"
@@ -12,6 +13,9 @@ import (
 func main() {
 	// Initialize logger first
 	logger.Initialize()
+
+	// Initialize shutdown coordinator with custom timeout
+	shutdown.Initialize(10 * time.Second)
 
 	// Create context for application
 	ctx := context.Background()

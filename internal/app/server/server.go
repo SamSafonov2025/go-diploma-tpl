@@ -38,7 +38,9 @@ func (s *HTTPServer) Serve() {
 }
 
 func (s *HTTPServer) registerShutdown() {
+	// Register shutdown handler with the coordinator
 	shutdown.Manager().Register(func(ctx context.Context) error {
+		zap.L().Info("Shutting down HTTP server")
 		return s.srv.Shutdown(ctx)
 	})
 }
