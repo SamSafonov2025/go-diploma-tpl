@@ -3,18 +3,29 @@ package router
 import (
 	"context"
 
+	"github.com/SamSafonov2025/go-diploma-tpl/internal/accrual"
 	"github.com/SamSafonov2025/go-diploma-tpl/internal/handlers"
 	"github.com/SamSafonov2025/go-diploma-tpl/internal/middleware"
 	"github.com/SamSafonov2025/go-diploma-tpl/internal/service/gophermart"
+	"github.com/SamSafonov2025/go-diploma-tpl/internal/storage/postgres"
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	"go.uber.org/zap"
 )
 
 func Setup(ctx context.Context) chi.Router {
 	r := chi.NewRouter()
 
-	// Initialize gophermart service
-	gophermartService := gophermart.NewService(ctx)
+	// Initialize dependencies
+	storage := postgres.NewStorage(ctx)
+	accrualClient := accrual.NewClient() // Now returns *Client which implements the interface
+
+	// Create service using options pattern
+	gophermartService := gophermart.NewService(ctx,
+		gophermart.WithStorage(storage),
+		gophermart.WithAccrualClient(accrualClient), // *Client implements service.AccrualClient
+		gophermart.WithLogger(zap.L()),
+	)
 
 	// Apply global middlewares
 	r.Use(

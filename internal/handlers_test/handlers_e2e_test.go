@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -232,8 +233,10 @@ func TestAPI_EndToEnd_Spec(t *testing.T) {
 	m := newMem()
 
 	svc := gophermart.NewService(context.Background(),
-		func(s *gophermart.Service) { s.Repository = m },
+		gophermart.WithStorage(m),
+		gophermart.WithLogger(zap.L()),
 	)
+
 	app := buildRouter(svc)
 	ts := httptest.NewServer(app)
 	defer ts.Close()

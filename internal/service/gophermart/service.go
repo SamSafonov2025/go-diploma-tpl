@@ -2,49 +2,93 @@ package gophermart
 
 import (
 	"context"
+	"github.com/SamSafonov2025/go-diploma-tpl/internal/models"
 	"time"
 
-	"github.com/SamSafonov2025/go-diploma-tpl/internal/accrual"
-	"github.com/SamSafonov2025/go-diploma-tpl/internal/storage"
+	"github.com/SamSafonov2025/go-diploma-tpl/internal/service"
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 )
 
-const updateInterval = 10 * time.Second
+const defaultUpdateInterval = 10 * time.Second
 
+// Service manages the gophermart business logic
 type Service struct {
-	AccrualAPI accrual.Client
-	Repository storage.Storage
+	accrualClient  service.AccrualClient
+	storage        service.Storage
+	updateInterval time.Duration
+	logger         *zap.Logger
 }
 
-func NewService(ctx context.Context, options ...ServiceOption) *Service {
-	service := &Service{
-		AccrualAPI: accrual.NewClient(),
+// NewService creates service with options pattern
+func NewService(ctx context.Context, opts ...Option) *Service {
+	svc := &Service{
+		updateInterval: defaultUpdateInterval,
+		logger:         zap.L(),
 	}
 
-	// Apply options
-	for _, opt := range options {
-		opt(service)
+	// Apply all options
+	for _, opt := range opts {
+		opt(svc)
 	}
 
-	// Use default storage if not provided
-	if service.Repository == nil {
-		WithStorage(ctx)(service)
+	// Set defaults if not provided by options
+	if svc.storage == nil {
+		WithDefaultStorage(ctx)(svc)
 	}
 
-	// Start background order processing
-	service.startBackgroundProcessing(ctx)
+	// Start background processing if accrual client is provided
+	if svc.accrualClient != nil {
+		svc.startBackgroundProcessing(ctx)
+	}
 
-	return service
+	return svc
 }
 
+// Option functions for configuring the service
+
+// WithAccrualClient sets the accrual client
+func WithAccrualClient(client service.AccrualClient) Option {
+	return func(s *Service) {
+		s.accrualClient = client
+	}
+}
+
+// WithStorage sets the storage
+func WithStorage(storage service.Storage) Option {
+	return func(s *Service) {
+		s.storage = storage
+	}
+}
+
+// WithUpdateInterval sets the update interval
+func WithUpdateInterval(interval time.Duration) Option {
+	return func(s *Service) {
+		s.updateInterval = interval
+	}
+}
+
+// WithLogger sets the logger
+func WithLogger(logger *zap.Logger) Option {
+	return func(s *Service) {
+		s.logger = logger
+	}
+}
+
+// Repository returns the storage interface (for handlers)
+func (s *Service) Repository() service.Storage {
+	return s.storage
+}
+
+// Rest of the methods remain the same...
 func (s *Service) startBackgroundProcessing(ctx context.Context) {
-	ticker := time.NewTicker(updateInterval)
+	ticker := time.NewTicker(s.updateInterval)
 
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				zap.L().Error("Recovered from panic in background processing", zap.Any("panic", r))
+				s.logger.Error("Recovered from panic in background processing",
+					zap.Any("panic", r))
 			}
 		}()
 
@@ -54,6 +98,7 @@ func (s *Service) startBackgroundProcessing(ctx context.Context) {
 				s.processOrders(ctx)
 			case <-ctx.Done():
 				ticker.Stop()
+				s.logger.Info("Background processing stopped")
 				return
 			}
 		}
@@ -61,10 +106,10 @@ func (s *Service) startBackgroundProcessing(ctx context.Context) {
 }
 
 func (s *Service) processOrders(ctx context.Context) {
-	// Fetch unprocessed orders
-	pendingOrders, err := s.Repository.FetchPendingOrders(ctx)
+	// Same implementation as before
+	pendingOrders, err := s.storage.FetchPendingOrders(ctx)
 	if err != nil {
-		zap.L().Warn("Failed to fetch pending orders", zap.Error(err))
+		s.logger.Warn("Failed to fetch pending orders", zap.Error(err))
 		return
 	}
 
@@ -72,34 +117,41 @@ func (s *Service) processOrders(ctx context.Context) {
 		return
 	}
 
-	// Process each order
+	s.logger.Debug("Processing pending orders", zap.Int("count", len(pendingOrders)))
+
 	for _, order := range pendingOrders {
-		// Get order info from accrual service
-		updatedOrder, err := s.AccrualAPI.FetchOrderInfo(order)
-		if err != nil {
-			zap.L().Warn("Failed to fetch order info from accrual",
-				zap.String("orderID", order.ID),
-				zap.Error(err))
-			continue
+		s.processOrder(ctx, order)
+	}
+}
+
+func (s *Service) processOrder(ctx context.Context, order models.Order) {
+	updatedOrder, err := s.accrualClient.FetchOrderInfo(order)
+	if err != nil {
+		s.logger.Warn("Failed to fetch order info from accrual",
+			zap.String("orderID", order.ID),
+			zap.Error(err))
+		return
+	}
+
+	err = s.storage.ExecuteTransaction(ctx, func(ctx context.Context, tx *sqlx.Tx) error {
+		if err := s.storage.ModifyOrder(ctx, updatedOrder, tx); err != nil {
+			return err
 		}
 
-		// Update order in transaction
-		if err = s.Repository.ExecuteTransaction(ctx, func(ctx context.Context, tx *sqlx.Tx) error {
-			// Update order status
-			if err := s.Repository.ModifyOrder(ctx, updatedOrder, tx); err != nil {
-				return err
-			}
-
-			// Update balance if accrual exists
-			if updatedOrder.Accrual == nil {
-				return nil
-			}
-
-			return s.Repository.UpdateBalance(ctx, updatedOrder.UID, updatedOrder.Accrual, tx)
-		}); err != nil {
-			zap.L().Warn("Failed to update order",
-				zap.String("orderID", order.ID),
-				zap.Error(err))
+		if updatedOrder.Accrual == nil {
+			return nil
 		}
+
+		return s.storage.UpdateBalance(ctx, updatedOrder.UID, updatedOrder.Accrual, tx)
+	})
+
+	if err != nil {
+		s.logger.Warn("Failed to update order",
+			zap.String("orderID", order.ID),
+			zap.Error(err))
+	} else {
+		s.logger.Debug("Order processed successfully",
+			zap.String("orderID", order.ID),
+			zap.String("status", string(updatedOrder.AccrualStatus)))
 	}
 }

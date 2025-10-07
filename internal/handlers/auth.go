@@ -34,7 +34,7 @@ func RegisterUser(svc *gophermart.Service) http.HandlerFunc {
 		userInfo.Password = string(passwordHash)
 
 		// Store user in database
-		if err = svc.Repository.CreateUser(r.Context(), userInfo); err != nil {
+		if err = svc.Repository().CreateUser(r.Context(), userInfo); err != nil {
 			helpers.RespondWithError(w, err)
 			return
 		}
@@ -61,7 +61,7 @@ func LoginUser(svc *gophermart.Service) http.HandlerFunc {
 		}
 
 		// достаём пользователя из БД
-		storedUser, err := svc.Repository.FindUserByLogin(r.Context(), userInfo)
+		storedUser, err := svc.Repository().FindUserByLogin(r.Context(), userInfo)
 		if err != nil {
 			helpers.RespondWithError(w, err)
 			return

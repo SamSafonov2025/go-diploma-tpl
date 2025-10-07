@@ -49,11 +49,11 @@ func SubmitOrder(svc *gophermart.Service) http.HandlerFunc {
 			AccrualStatus: models.StatusNew,
 		}
 
-		err = svc.Repository.ExecuteTransaction(r.Context(), func(ctx context.Context, tx *sqlx.Tx) error {
-			if err := svc.Repository.CreateOrder(ctx, orderData, tx); err != nil {
+		err = svc.Repository().ExecuteTransaction(r.Context(), func(ctx context.Context, tx *sqlx.Tx) error {
+			if err := svc.Repository().CreateOrder(ctx, orderData, tx); err != nil {
 				return err
 			}
-			return svc.Repository.UpdateBalance(ctx, userInfo.ID, orderData.Accrual, tx)
+			return svc.Repository().UpdateBalance(ctx, userInfo.ID, orderData.Accrual, tx)
 		})
 		if err != nil {
 			if errors.Is(err, models.ErrOrderExists) {
@@ -80,7 +80,7 @@ func ListOrders(svc *gophermart.Service) http.HandlerFunc {
 		}
 
 		// Fetch user orders
-		userOrders, err := svc.Repository.FetchOrdersByUserID(r.Context(), userInfo.ID)
+		userOrders, err := svc.Repository().FetchOrdersByUserID(r.Context(), userInfo.ID)
 		if err != nil {
 			helpers.RespondWithError(w, err)
 			return

@@ -36,9 +36,9 @@ func WithdrawFunds(svc *gophermart.Service) http.HandlerFunc {
 		}
 
 		// Process withdrawal in transaction
-		err = svc.Repository.ExecuteTransaction(r.Context(), func(ctx context.Context, tx *sqlx.Tx) error {
+		err = svc.Repository().ExecuteTransaction(r.Context(), func(ctx context.Context, tx *sqlx.Tx) error {
 			// Check balance
-			availableBalance, err := svc.Repository.FetchCurrentBalance(ctx, userInfo.ID, tx)
+			availableBalance, err := svc.Repository().FetchCurrentBalance(ctx, userInfo.ID, tx)
 			if err != nil {
 				return err
 			}
@@ -48,12 +48,12 @@ func WithdrawFunds(svc *gophermart.Service) http.HandlerFunc {
 			}
 
 			// Create withdrawal record
-			if err = svc.Repository.CreateWithdrawal(ctx, withdrawRequest, tx); err != nil {
+			if err = svc.Repository().CreateWithdrawal(ctx, withdrawRequest, tx); err != nil {
 				return err
 			}
 
 			// Update withdrawn amount
-			return svc.Repository.IncreaseWithdrawnAmount(ctx, userInfo.ID, withdrawRequest.Amount, tx)
+			return svc.Repository().IncreaseWithdrawnAmount(ctx, userInfo.ID, withdrawRequest.Amount, tx)
 		})
 
 		if err != nil {
@@ -74,7 +74,7 @@ func ListWithdrawals(svc *gophermart.Service) http.HandlerFunc {
 		}
 
 		// Fetch withdrawals
-		userWithdrawals, err := svc.Repository.FetchWithdrawalsByUserID(r.Context(), userInfo.ID)
+		userWithdrawals, err := svc.Repository().FetchWithdrawalsByUserID(r.Context(), userInfo.ID)
 		if err != nil {
 			helpers.RespondWithError(w, err)
 			return

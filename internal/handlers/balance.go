@@ -18,7 +18,7 @@ func Balance(svc *gophermart.Service) http.HandlerFunc {
 		}
 
 		// Get user balance
-		userBalance, err := svc.Repository.FetchBalanceByUserID(r.Context(), userInfo.ID)
+		userBalance, err := svc.Repository().FetchBalanceByUserID(r.Context(), userInfo.ID)
 		if err != nil {
 			helpers.RespondWithError(w, err)
 			return
