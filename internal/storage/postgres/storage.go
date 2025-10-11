@@ -63,7 +63,7 @@ func NewStorage(ctx context.Context) storage.Storage {
 	cfg := config.Load()
 
 	// Connect to database
-	conn, err := sqlx.Connect("pgx", cfg.DatabaseDSN)
+	conn, err := sqlx.Connect("pgx", cfg.Database.DSN)
 	if err != nil {
 		zap.L().Fatal("Failed to connect to database", zap.Error(err))
 	}

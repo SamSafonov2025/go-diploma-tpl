@@ -45,7 +45,7 @@ func (c *Client) FetchOrderInfo(orderData models.Order) (models.Order, error) {
 }
 
 func (c *Client) createRequest(orderID string) (*http.Request, error) {
-	baseURL, err := url.Parse(config.Load().AccrualSystemURL)
+	baseURL, err := url.Parse(config.Load().External.AccrualURL)
 	if err != nil {
 		return nil, err
 	}

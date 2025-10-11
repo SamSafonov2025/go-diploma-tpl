@@ -20,7 +20,7 @@ func CreateToken(userInfo models.User) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(config.Load().TokenSecret))
+	return token.SignedString([]byte(config.Load().Security.TokenSecret))
 }
 
 // ExtractUserIDFromToken валидирует токен и извлекает userID
@@ -30,7 +30,7 @@ func ExtractUserIDFromToken(tokenString string) (string, error) {
 		if t.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
-		return []byte(config.Load().TokenSecret), nil
+		return []byte(config.Load().Security.TokenSecret), nil
 	})
 	if err != nil {
 		return "", models.ErrInvalidToken

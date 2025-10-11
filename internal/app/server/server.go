@@ -18,7 +18,7 @@ func NewHTTPServer(ctx context.Context) *HTTPServer {
 	cfg := config.Load()
 	return &HTTPServer{
 		srv: http.Server{
-			Addr:    cfg.ServerAddr,
+			Addr:    cfg.Server.Addr,
 			Handler: router.Setup(ctx),
 		},
 	}

@@ -162,6 +162,8 @@ func startAccrualFake(t *testing.T) *httptest.Server {
 
 // --- роутер, как в проде, но с нашим сервисом ---
 func buildRouter(svc *gophermart.Service) http.Handler {
+	// Create orders handler instance
+	ordersHandler := handlers.NewOrdersHandler(svc)
 	r := chi.NewRouter()
 	r.Use(mw.RequestID, mw.RealIP, mw.Logger, mw.Recoverer, mw.Compress(5), middleware.Decompressor)
 	r.Route("/api/user", func(r chi.Router) {
@@ -177,8 +179,8 @@ func buildRouter(svc *gophermart.Service) http.Handler {
 				r.Post("/withdraw", handlers.WithdrawFunds(svc))
 			})
 			r.Route("/orders", func(r chi.Router) {
-				r.Get("/", handlers.ListOrders(svc))
-				r.Post("/", handlers.SubmitOrder(svc)) // text/plain
+				r.Get("/", ordersHandler.ListOrders())
+				r.Post("/", ordersHandler.SubmitOrder()) // text/plain
 			})
 			r.Get("/withdrawals", handlers.ListWithdrawals(svc))
 		})

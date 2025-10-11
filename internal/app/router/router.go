@@ -37,6 +37,9 @@ func Setup(ctx context.Context) chi.Router {
 		middleware.Decompressor,
 	)
 
+	// Create orders handler instance
+	ordersHandler := handlers.NewOrdersHandler(gophermartService)
+
 	// Setup API routes
 	r.Route("/api/user", func(r chi.Router) {
 		// Protected routes
@@ -49,8 +52,8 @@ func Setup(ctx context.Context) chi.Router {
 			})
 
 			r.Route("/orders", func(r chi.Router) {
-				r.Get("/", handlers.ListOrders(gophermartService))
-				r.Post("/", handlers.SubmitOrder(gophermartService))
+				r.Get("/", ordersHandler.ListOrders())
+				r.Post("/", ordersHandler.SubmitOrder())
 			})
 
 			r.Get("/withdrawals", handlers.ListWithdrawals(gophermartService))
